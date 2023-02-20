@@ -17,3 +17,6 @@
 ![photo_2023-02-20_22-35-03](https://user-images.githubusercontent.com/125460099/220188977-3e15acad-f998-4f52-bf75-9981a006bdc3.jpg)
 ![photo_2023-02-20_22-35-08](https://user-images.githubusercontent.com/125460099/220188981-aa3012ce-4922-49b3-a84d-e3376bddee98.jpg)
 ![photo_2023-02-20_22-35-14](https://user-images.githubusercontent.com/125460099/220188983-26af0fce-f9dc-4601-bcc2-05208b3a5d2a.jpg)
+
+Видеоролик, демонстрирующий функционирование разработанного устройства:
+https://youtu.be/CsZWqf-S8z4
