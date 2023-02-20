@@ -1,0 +1,219 @@
+PrimaryI2C.setup({sda: SDA, scl: SCL, bitrate: 100000});
+
+var SSID = 'Chkalova_550';			// wifi login
+//var SSID = 'myflower';			// wifi login
+var PASSWORD = '896745231';		// wifi password
+var sdCard = require('card-reader').connect(P7);
+var light = require('light-sensor').connect(A1);
+//var auto = require('led').connect(P9);
+var hum = require('led').connect(P5);
+var server = require('server').create();
+var meteoSensor = require('meteo-sensor').connect();
+var meteoSensor2 = require('meteo-sensor').connect({
+ address: 0x45
+});
+var lcd = require("HD44780").connectI2C(PrimaryI2C, 0x38);
+var pump = require('power-control').connect(P8);
+var led = require('power-control').connect(P9);
+var uvl = require('power-control').connect(P10);
+
+var levelSensorOnBottom = require('water-level').connect(P11, {debounce: 3});
+
+levelSensorOnBottom.read();
+levelSensorOnBottom.on('down', function () {
+  console.log('water level is low');
+});
+ 
+levelSensorOnBottom.on('up', function () {
+  console.log('water level is high');
+});
+
+var automatic, a, b, c, d, e;
+var mode;
+
+e=0;
+
+var Motor = require('motor');
+ 
+// ?????????? ????? ? ????????? ???? ???????? ? ??????????? ????????
+var myMotor = Motor.connect({phasePin: A3, pwmPin: P12, freq: 100});
+myMotor.write(0);
+
+function sleep(milliseconds) {
+  const date = Date.now();
+  let currentDate = null;
+  do {
+    currentDate = Date.now();
+  } while (currentDate - date < milliseconds);
+}
+
+hum.turnOn();
+
+ setInterval(function() {
+     meteoSensor.read(function(err, data){
+       if (err) {
+      console.log(err);
+    } else {
+    temperature_meteosensor = Math.round(data.tempC * 10) / 10;
+    humidity_meteosensor = Math.round(data.humidity * 10) / 10;
+    }});
+   
+     meteoSensor2.read(function(err, data){
+       if (err) {
+      console.log(err);
+    } else {
+    temperature_meteosensor_2 = Math.round(data.tempC * 10) / 10;
+    humidity_meteosensor_2 = Math.round(data.humidity * 10) / 10;
+    }});
+
+    lightsensor = Math.round(light.read() * 1000) / 10; 
+    watersensor = Math.round(analogRead(A0) * 1000) / 10; 
+    watersensor_2 = Math.round(analogRead(A2) * 1000) / 10; 
+
+lcd.setCursor(0, 0);
+lcd.print("Te"+"\xBC\xBE"+"epa"+"\xBF"+"ypa" +" - "+       (((temperature_meteosensor+temperature_meteosensor_2)/2).toFixed(1)) + "\x99"+"C");  
+
+lcd.setCursor(0, 1);
+lcd.print("B"+"\xBB"+"."+" "+"\xB3"+"o"+"\xC5\xE3"+"y"+"xa"+" - "+(((humidity_meteosensor+humidity_meteosensor_2)/2).toFixed(1))+"\x25");
+
+lcd.setCursor(0, 2);
+lcd.print("B"+"\xBB"+"."+" "+"\xBE"+"o"+"\xC0\xB3\xC3"+"   - "+(((watersensor+watersensor_2)/2).toFixed(1))+""+"\x25");
+
+lcd.setCursor(0, 3);
+lcd.print("\x50"+"e"+"\xB6"+"\xB8"+"\xBC"+"   - "+"${mode}");
+
+}, 1000);
+
+
+server.on('/', function(req, res) {
+  var content = sdCard.readFile('flower3.html'); 
+  res.send(content);
+});
+
+server.on('/', function(req, res) {
+});
+
+server.on('/led/on', function(req, res) {
+  led.turnOn();
+});
+
+server.on('/led/off', function(req, res) {
+  led.turnOff();
+});
+
+server.on('/wind/on', function(req, res) {
+  myMotor.write(0.45);
+   sleep(3500); 
+  myMotor.write(0);
+});
+
+server.on('/wind/off', function(req, res) {
+  myMotor.write(-0.45);
+  sleep(3000); 
+  myMotor.write(0);
+});
+
+server.on('/uvl/on', function(req, res) {
+  uvl.turnOn();
+  if (uvl.isOn() == true) { setTimeout(() => { hum.blink(1, 0.5); }, 5000);}
+  if (uvl.isOn() == true) { setTimeout(() => { hum.turnOn(); }, 6500);}
+});
+
+server.on('/uvl/off', function(req, res) {
+  uvl.turnOff();
+});
+
+server.on('/pump/on', function(req, res) {
+  pump.pulse(1);
+});
+
+server.on('/pump/off', function(req, res) {
+  pump.turnOff();
+});
+
+server.on('/auto/on', function(req, res) {
+  automatic=100;
+  auto.turnOn();
+  pump.turnOff();
+  led.turnOff();
+  uvl.turnOff();
+  mode="auto";
+});
+
+server.on('/auto/off', function(req, res) {
+  automatic=0;
+  auto.turnOff();
+  led.turnOff();
+  pump.turnOff();
+  uvl.turnOff();
+  myMotor.write(0);
+  mode="handle";
+});
+
+server.on('/temp', function(req, res) {
+    res.send('DT1 - ' + temperature_meteosensor + ' C     ');
+    res.send('DT2 - ' + temperature_meteosensor_2 + ' C     ');
+    res.send('DTcp - ' + ((temperature_meteosensor+temperature_meteosensor_2)/2) + ' C     ');
+});
+
+
+server.on('/Hum', function(req, res) {
+    res.send('DVV1 - ' + humidity_meteosensor + ' %     ');
+    res.send('DVV2 - ' + humidity_meteosensor_2 + ' %     '); 
+    res.send('DVVcp - '+ ((humidity_meteosensor+humidity_meteosensor_2)/2) + ' %     ');
+});
+
+server.on('/light', function(req, res) {
+    res.send(+ Math.round(light.read() * 1000) / 10 + '%');
+});
+
+server.on('/water', function(req, res) {
+    res.send('DVP1 - ' + watersensor + ' %     ');
+    res.send('DVP2 - ' + watersensor_2 + ' %     '); 
+    res.send('DVPcp - ' + ((watersensor+watersensor_2)/2) + '%'  );
+});
+
+setInterval(function() {
+ if (automatic == 100) {
+   
+a=((watersensor+watersensor_2)/2);
+b=light.read();
+c=((humidity_meteosensor+humidity_meteosensor_2)/2)/100;
+d=((temperature_meteosensor+temperature_meteosensor_2)/2);
+
+//hystpump.push(a);
+//hystled.push(b);
+//hystuvl.push(c);  
+   
+if (a<0.4) { pump.pulse(1);}
+if (a>0.4) { pump.turnOff();}   
+   
+if (c<0.6) { uvl.turnOn();}
+  if (uvl.isOn() == true) { setTimeout(() => { hum.blink(1, 0.5); }, 5000);}
+  if (uvl.isOn() == true) { setTimeout(() => { hum.turnOn(); }, 6500);}
+if (c>0.6) { uvl.turnOff();}
+   
+if (b>0.8) { led.turnOn();}
+if (b<0.8) { led.turnOff();}  
+   
+if (e==0) {
+  if (d>38) { myMotor.write(0.45);
+   sleep(3500); 
+   myMotor.write(0); e=1;}}
+if (e==1) {
+  if (d<=37) { myMotor.write(-0.45); 
+    sleep(3000); 
+    myMotor.write(0); e=0;}}
+}  
+}, 5000);
+
+
+var wifi = require('wifi').setup(function(err) { 
+  wifi.connect(SSID, PASSWORD, function(err) {
+    wifi.getIP(function(err, ip) {
+      print('I\'m ready! http://'+ip+'/');
+      server.listen(80);
+      //run();
+    });
+  });
+});
